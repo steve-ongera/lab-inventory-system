@@ -126,7 +126,7 @@ CORS_ALLOWED_ORIGINS = config(
 )
  
 # --------------------------------------------------------------------------
-# Business-rule settings (used by inventory/services.py & job_scheduler.py)
+# Business-rule settings (used by api/services.py & job_scheduler.py)
 # --------------------------------------------------------------------------
 EXPIRY_WATCH_WINDOW_DAYS = config("EXPIRY_WATCH_WINDOW_DAYS", default=90, cast=int)
 LOW_STOCK_SCAN_HOUR = config("LOW_STOCK_SCAN_HOUR", default=6, cast=int)

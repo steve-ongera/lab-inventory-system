@@ -1,4 +1,5 @@
 """
+api/models.py
 Models for the Laboratory Inventory Management System.
 
 Mapping back to the source workbook:
@@ -22,7 +23,7 @@ class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        "inventory.StaffProfile",
+        "api.StaffProfile",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
