@@ -15,6 +15,18 @@ const NAV_ITEMS = [
 export default function Sidebar({ isOpen }) {
   return (
     <aside className={`sidebar ${isOpen ? "sidebar--open" : "sidebar--collapsed"}`}>
+      {/* Sidebar Header with Logo */}
+      <div className="sidebar__header">
+        <div className="sidebar__logo">
+          <img src="/logo.png" alt="LMIS Logo" />
+        </div>
+        <div className="sidebar__brand">
+          <span className="sidebar__brand-name">LMIS</span>
+          <span className="sidebar__brand-sub">Lab Inventory System</span>
+        </div>
+      </div>
+
+      {/* Navigation */}
       <nav className="sidebar__nav">
         {NAV_ITEMS.map((item) => (
           <NavLink
@@ -32,6 +44,21 @@ export default function Sidebar({ isOpen }) {
           </NavLink>
         ))}
       </nav>
+
+      {/* Sidebar Footer */}
+      <div className="sidebar__footer">
+        <div className="sidebar__footer-divider"></div>
+        <div className="sidebar__footer-content">
+          <span className="sidebar__footer-version">
+            <i className="bi bi-tag" aria-hidden="true"></i>
+            LMIS v2.1
+          </span>
+          <span className="sidebar__footer-copy">
+            <i className="bi bi-circle" aria-hidden="true"></i>
+            {new Date().getFullYear()}
+          </span>
+        </div>
+      </div>
     </aside>
   );
 }

@@ -13,6 +13,7 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (isAuthenticated) {
     return <Navigate to={location.state?.from?.pathname || "/"} replace />;
@@ -35,23 +36,79 @@ export default function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
+        {/* Logo */}
+        <div className="login-logo">
+          <img src="/logo.png" alt="Lab Inventory System Logo" />
+        </div>
+
+        {/* Brand name */}
         <h1>Lab Inventory System</h1>
+
+        {/* Username field */}
         <label>
-          Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <span className="label-with-icon">
+            <i className="bi bi-person" aria-hidden="true"></i>
+            Username
+          </span>
+          <div className="input-wrapper">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
+              required
+              autoComplete="username"
+            />
+          </div>
         </label>
+
+        {/* Password field with toggle */}
         <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <span className="label-with-icon">
+            <i className="bi bi-lock" aria-hidden="true"></i>
+            Password
+          </span>
+          <div className="input-wrapper input-wrapper--password">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              required
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              tabIndex={-1}
+            >
+              <i className={`bi ${showPassword ? "bi-eye-slash" : "bi-eye"}`}></i>
+            </button>
+          </div>
         </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Signing in..." : "Sign in"}
+
+        {/* Submit button */}
+        <button type="submit" disabled={submitting} className="login-submit">
+          {submitting ? (
+            <>
+              <span className="spinner" aria-hidden="true"></span>
+              Signing in...
+            </>
+          ) : (
+            <>
+              <i className="bi bi-box-arrow-in-right" aria-hidden="true"></i>
+              Sign in
+            </>
+          )}
         </button>
+
+        {/* Footer hint */}
+        <p className="login-hint">
+          <i className="bi bi-info-circle" aria-hidden="true"></i>
+          Demo: any username / password
+        </p>
       </form>
     </div>
   );
