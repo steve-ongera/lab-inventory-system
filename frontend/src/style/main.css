@@ -1,0 +1,558 @@
+/* ==========================================================================
+   Lab Inventory System — Design Tokens
+   A clinical, precise aesthetic: cool slate ink on a pale lab-bench white,
+   a deep teal accent (distinct from the usual AI-default terracotta/neon),
+   and monospace used specifically for item codes, IDs and quantities —
+   the things a lab technologist actually reads off a label or printout.
+   ========================================================================== */
+
+:root {
+  /* Color */
+  --color-bg: #f4f7f8;
+  --color-surface: #ffffff;
+  --color-ink: #16262c;
+  --color-ink-muted: #5b6b70;
+  --color-border: #dde4e6;
+  --color-accent: #0f6e67;       /* lab-teal */
+  --color-accent-dark: #0b514c;
+  --color-accent-soft: #e3f0ee;
+  --color-warning: #a9720a;
+  --color-warning-soft: #fbf0d9;
+  --color-danger: #a83a3a;
+  --color-danger-soft: #fbe7e7;
+  --color-success: #2f7d4f;
+  --color-success-soft: #e5f3ea;
+
+  /* Type */
+  --font-ui: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-data: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --sidebar-width-collapsed: 64px;
+  --navbar-height: 60px;
+  --radius: 6px;
+  --shadow-sm: 0 1px 2px rgba(22, 38, 44, 0.06);
+  --shadow-md: 0 4px 16px rgba(22, 38, 44, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
+}
+
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.1rem; color: var(--color-ink-muted); }
+
+a {
+  color: var(--color-accent);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   App shell
+   ========================================================================== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-shell__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-shell__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 64px;
+}
+
+.page-loading {
+  padding: 48px;
+  text-align: center;
+  color: var(--color-ink-muted);
+}
+
+/* ==========================================================================
+   Navbar
+   ========================================================================== */
+.navbar {
+  height: var(--navbar-height);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 10;
+}
+
+.navbar__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.navbar__menu-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar__menu-btn:hover {
+  background: var(--color-accent-soft);
+}
+
+.navbar__menu-icon,
+.navbar__menu-icon::before,
+.navbar__menu-icon::after {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 2px;
+  background: var(--color-ink);
+  position: relative;
+}
+
+.navbar__menu-icon::before { transform: translateY(-5px); position: absolute; }
+.navbar__menu-icon::after { transform: translateY(5px); position: absolute; }
+
+.navbar__brand {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.navbar__right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar__icon-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+}
+
+.navbar__user {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+}
+
+.navbar__user:hover {
+  background: var(--color-bg);
+}
+
+.navbar__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-data);
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar__username {
+  font-size: 0.88rem;
+}
+
+.navbar__dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  overflow: hidden;
+}
+
+.navbar__dropdown button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+}
+
+.navbar__dropdown button:hover {
+  background: var(--color-accent-soft);
+}
+
+/* ==========================================================================
+   Sidebar
+   ========================================================================== */
+.sidebar {
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 16px 8px;
+  transition: width 0.15s ease;
+  overflow-x: hidden;
+}
+
+.sidebar--open {
+  width: var(--sidebar-width);
+}
+
+.sidebar--collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  color: var(--color-ink-muted);
+  text-decoration: none;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.sidebar__link:hover {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+.sidebar__link--active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-dark);
+  font-weight: 600;
+}
+
+.sidebar__icon {
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Page / panel / card primitives
+   ========================================================================== */
+.page {
+  max-width: 1120px;
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card--warning { border-left-color: var(--color-warning); }
+.stat-card--danger { border-left-color: var(--color-danger); }
+
+.stat-card__value {
+  font-family: var(--font-data);
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.stat-card__label {
+  font-size: 0.78rem;
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   Charts (line / bar / pie — rendered with recharts)
+   ========================================================================== */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-panel h2 {
+  margin-bottom: 12px;
+}
+
+.chart-empty {
+  color: var(--color-ink-muted);
+  font-size: 0.86rem;
+  padding: 40px 0;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Data tables — codes, IDs and quantities render in monospace so columns
+   of numbers/IDs stay aligned, the way they would on a printed lab sheet.
+   ========================================================================== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.data-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-data);
+  font-size: 0.84rem;
+}
+
+.data-table tbody tr:hover {
+  background: var(--color-bg);
+}
+
+/* ==========================================================================
+   Status badges — styled like a specimen label chip
+   ========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge--success { background: var(--color-success-soft); color: var(--color-success); }
+.badge--warning { background: var(--color-warning-soft); color: var(--color-warning); }
+.badge--danger { background: var(--color-danger-soft); color: var(--color-danger); }
+.badge--default { background: var(--color-bg); color: var(--color-ink-muted); }
+
+/* ==========================================================================
+   Forms / buttons
+   ========================================================================== */
+button {
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+button:hover {
+  background: var(--color-accent-dark);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+input {
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  width: 100%;
+}
+
+input:focus,
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.84rem;
+  color: var(--color-ink-muted);
+  margin-bottom: 14px;
+}
+
+/* ==========================================================================
+   Login page
+   ========================================================================== */
+.login-page {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+
+.login-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 32px;
+  width: 320px;
+}
+
+.login-card h1 {
+  font-size: 1.15rem;
+  margin-bottom: 24px;
+}
+
+/* ==========================================================================
+   Flash notifications (toasts)
+   ========================================================================== */
+.flash-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.flash-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 240px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  font-size: 0.86rem;
+  color: #fff;
+  background: var(--color-ink);
+}
+
+.flash-toast--success { background: var(--color-success); }
+.flash-toast--warning { background: var(--color-warning); }
+.flash-toast--error { background: var(--color-danger); }
+.flash-toast--info { background: var(--color-accent-dark); }
+
+.flash-toast__close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   Misc
+   ========================================================================== */
+.not-found {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell__content {
+    padding: 16px;
+  }
+
+  .sidebar--open {
+    position: fixed;
+    top: var(--navbar-height);
+    bottom: 0;
+    left: 0;
+    box-shadow: var(--shadow-md);
+  }
+}
