@@ -26,14 +26,14 @@ export default function Navbar({ onToggleSidebar }) {
           onClick={onToggleSidebar}
           aria-label="Toggle sidebar"
         >
-          <span className="navbar__menu-icon" />
+          <i className="bi bi-list" aria-hidden="true"></i>
         </button>
         <span className="navbar__brand">Lab Inventory System</span>
       </div>
 
       <div className="navbar__right">
         <button className="navbar__icon-btn" aria-label="Notifications">
-          🔔
+          <i className="bi bi-bell" aria-hidden="true"></i>
         </button>
 
         <div className="navbar__user" onClick={() => setMenuOpen((open) => !open)}>
@@ -42,8 +42,14 @@ export default function Navbar({ onToggleSidebar }) {
 
           {menuOpen && (
             <div className="navbar__dropdown">
-              <button onClick={() => navigate("/settings")}>Settings</button>
-              <button onClick={handleLogout}>Sign out</button>
+              <button onClick={() => navigate("/settings")}>
+                <i className="bi bi-gear" aria-hidden="true"></i>
+                Settings
+              </button>
+              <button onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right" aria-hidden="true"></i>
+                Sign out
+              </button>
             </div>
           )}
         </div>

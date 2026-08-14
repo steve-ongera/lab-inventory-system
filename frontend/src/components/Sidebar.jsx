@@ -1,15 +1,15 @@
 import { NavLink } from "react-router-dom";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: "📊", end: true },
-  { to: "/items", label: "Item Master", icon: "🧪" },
-  { to: "/stock-receipts", label: "Stock Receipts", icon: "📥" },
-  { to: "/dispensing-log", label: "Dispensing Log", icon: "📤" },
-  { to: "/current-stock", label: "Current Stock", icon: "📦" },
-  { to: "/expiry-watch", label: "Expiry Watch", icon: "⏳" },
-  { to: "/reports", label: "Reports", icon: "📄" },
-  { to: "/users", label: "Users", icon: "👥" },
-  { to: "/settings", label: "Settings", icon: "⚙️" },
+  { to: "/", label: "Dashboard", icon: "bi-bar-chart-line", end: true },
+  { to: "/items", label: "Item Master", icon: "bi-flask" },
+  { to: "/stock-receipts", label: "Stock Receipts", icon: "bi-box-arrow-in-down" },
+  { to: "/dispensing-log", label: "Dispensing Log", icon: "bi-box-arrow-up" },
+  { to: "/current-stock", label: "Current Stock", icon: "bi-boxes" },
+  { to: "/expiry-watch", label: "Expiry Watch", icon: "bi-hourglass-split" },
+  { to: "/reports", label: "Reports", icon: "bi-file-earmark-text" },
+  { to: "/users", label: "Users", icon: "bi-people" },
+  { to: "/settings", label: "Settings", icon: "bi-gear" },
 ];
 
 export default function Sidebar({ isOpen }) {
@@ -25,7 +25,9 @@ export default function Sidebar({ isOpen }) {
               `sidebar__link${isActive ? " sidebar__link--active" : ""}`
             }
           >
-            <span className="sidebar__icon">{item.icon}</span>
+            <span className="sidebar__icon">
+              <i className={`bi ${item.icon}`} aria-hidden="true"></i>
+            </span>
             <span className="sidebar__label">{item.label}</span>
           </NavLink>
         ))}
