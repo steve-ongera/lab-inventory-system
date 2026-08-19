@@ -1,49 +1,115 @@
 # Laboratory Information & Inventory Management System (LIMS-Inventory)
 
-A web application that replaces the **Laboratory Inventory Management System.xlsx** workbook with a proper client-server system: a Django REST API backend and a React (Vite) frontend.
-
-The data model below was reverse-engineered directly from the workbook's sheets: **Dashboard, Item Master, Stock Receipts, Dispensing Log, Current Stock, Settings, Users.**
+A web application that replaces the **Laboratory Inventory Management System.xlsx** workbook with a client-server system: a Django REST API backend and a React (Vite) frontend.
 
 ---
 
-## 1. What the spreadsheet tells us about the domain
+## 1. What Problem This System Solves
 
-| Sheet | Purpose | Becomes |
+Managing laboratory inventory through spreadsheets like Excel leads to stockouts, expired reagents, formula corruption, and zero chain-of-custody accountability. This system transforms static spreadsheet mechanics into an auditable, real-time transactional platform.
+
+* **Eliminating Double Bookkeeping & Manual Formulas:** Spreadsheets require manual updates across multiple tabs (`Item Master`, `Current Stock`, `Stock Receipts`), risking human error and broken formulas. This system uses a dynamic ledger model where available inventory is mathematically calculated from inbound and outbound transactions.
+* **Preventing Stockouts & Expired Reagent Wastage:** Medical and research labs rely on reagents with strict shelf lives. Background workers continuously evaluate stock levels and batch expiry dates to alert staff before items run out or expire on the shelf.
+* **Strict Chain of Custody & Compliance:** Every single stock movement (who received a batch, who dispensed a reagent to which department) is tied to authenticated user profiles and logged in immutable audit records.
+* **Controlled Vocabularies:** Eliminates data entry fragmentation by enforcing strict reference standards for item categories, measurement units, and approved suppliers.
+
+---
+
+## 2. System Objects & Data Entities
+
+The backend models (`api/models.py`) represent the system objects that govern data integrity and workflows:
+
+### Auxiliary & Configuration Objects
+* **`TimeStampedModel` (Abstract Base):** Mixin that automatically stamps `created_at`, `updated_at`, and `created_by` across core transactional entities.
+* **`Category`:** Controlled taxonomy for grouping inventory (e.g., Reagents, Consumables, Glassware).
+* **`Unit`:** Standardized units of measurement (e.g., Box, Vial, mL, Kit).
+* **`Supplier`:** Vendor directory holding supplier contact information and linking to supplied items and receipts.
+
+### User & Identity Management
+* **`StaffProfile`:** Extends Django's `User` model with laboratory-specific attributes (`staff_id`, `role` [Manager, Technologist, Admin], `department`, `phone`, `signature_initials`, `is_active`). Acts as the identity stamp for all receipts, dispenses, and audit logs.
+
+### Inventory Core
+* **`Item` (Item Master):** The master definition of an inventory product. Contains identifying details (`item_code`, `item_name`), relationships (`category`, `unit`, `supplier`), operational thresholds (`minimum_stock_level`, `reorder_quantity`), physical `storage_location`, and active status.
+
+### Transaction Ledger
+* **`StockReceipt`:** Records inbound inventory additions. Tracks unique `receipt_id`, date received, item reference, supplier, `batch_lot`, `expiry_date`, quantity received, unit cost, and the receiving staff member.
+* **`DispenseLog`:** Records outbound inventory usage. Tracks unique `dispense_id`, date dispensed, item reference, `batch_lot`, quantity dispensed, dispensing staff member, `recipient_department`, and purpose. Blocks attempts to dispense quantities greater than available stock.
+
+### Performance Caching & Alerting
+* **`StockSnapshot`:** A read-optimized, cached representation of the current stock state for an item. Contains precalculated totals (`total_received`, `total_dispensed`, `available_quantity`), status flags (`OK`, `Low Stock`, `Out of Stock`), and the `earliest_expiry` date across active batches. Refreshed automatically by background workers.
+* **`Notification`:** System and flash alerts delivered to staff (`INFO`, `SUCCESS`, `WARNING`, `ERROR`). Supports both user-specific and broadcast messages (e.g., low-stock warnings, expiring lot alerts).
+* **`AuditLog`:** An append-only audit trail recording every entity creation, modification, or deletion alongside the triggering user, action type, target model, target ID, and JSON payload change details.
+
+---
+
+## 3. End-to-End System Workflow
+
+```
+[ Admin / Manager ] ──► Setup Vocabularies & Staff Profiles
+                              │
+                              ▼
+[ Manager ]          ──► Define Item Master (Min Levels & Reorder Qty)
+                              │
+                              ▼
+[ Technologist ]     ──► Log Stock Receipt ──► Creates StockReceipt Ledger Entry
+                              │
+                              ▼
+[ Technologist ]     ──► Log Dispense      ──► Creates DispenseLog Ledger Entry
+                              │
+                              ▼
+[ Background Job / ] ──► Calculates: (Received - Dispensed)
+[ services.py      ] ──► Updates StockSnapshot & Evaluates Thresholds
+                              │
+                  ┌───────────┴───────────┐
+                  ▼                       ▼
+      [ Low Stock / Expiry ]     [ Dashboard & Reports ]
+        Triggers Notification       Displays Real-Time KPIs
+```
+
+1. **System Initialization:** Admins establish controlled lists (`Category`, `Unit`, `Supplier`) and provision `StaffProfile` accounts linked to authenticated users.
+2. **Catalog Definition:** Lab managers populate the `Item` master list, assigning storage locations, categories, and critical stock alert thresholds (`minimum_stock_level`).
+3. **Inbound Receiving:** When shipments arrive, staff log a `StockReceipt`. The system generates a tracking code (`REC-####`), links batch/lot details and expiry dates, and writes an immutable ledger entry.
+4. **Outbound Dispensing:** When reagents or supplies are needed, technologists log a `DispenseLog`. The backend service (`services.py`) validates that `quantity_dispensed` does not exceed current available stock before writing the entry (`DIS-####`).
+5. **Derivation & Snapshot Caching:** Rather than executing heavy aggregation queries on every dashboard request, `services.py` calculates the net available quantity (`Total Received - Total Dispensed`). A scheduled background job (`job_scheduler.py`) updates the `StockSnapshot` cache and sets the stock status (`OK`, `Low Stock`, or `Out of Stock`).
+6. **Monitoring & Alerting:** During snapshot calculation, if `available_quantity <= minimum_stock_level` or an item batch is within 90 days of expiration, a system `Notification` is triggered and flagged on the frontend dashboard.
+7. **Compliance Audit:** Every transaction automatically triggers `signals.py` to write an entry to `AuditLog`, recording the user ID, timestamp, model, and modified data.
+
+---
+
+## 4. Workbook Domain Mapping
+
+| Spreadsheet Sheet | System Object / Equivalent | Purpose in LIMS-Inventory |
 |---|---|---|
-| `Item Master` | Master list of every stock item (code, name, category, unit, supplier, min stock, reorder qty, storage location, active flag) | `Item` model |
-| `Stock Receipts` | Every batch of stock received (receipt ID, item, batch/lot, expiry date, supplier, qty received, unit cost, received by) | `StockReceipt` model |
-| `Dispensing Log` | Every issue of stock out of the lab (dispense ID, item, batch/lot, qty dispensed, dispensed by, recipient/department, purpose) | `DispenseLog` model |
-| `Current Stock` | Formula-driven view: `Available = Total Received − Total Dispensed`, plus `Stock Status` (OK / Low Stock / Out of Stock) and earliest expiry | Computed via `services.py`, exposed as a read-only endpoint (not stored as a raw table) |
-| `Settings` | Controlled lists: categories, units, suppliers, stock-status meanings, plus a list of "Future VBA Hooks" (validation + notification rules) | `Category`, `Unit`, `Supplier` lookup tables + validation/notification logic in `services.py` |
-| `Users` | Staff directory used by dropdowns (ID, name, role, department, active, signature initials) | `StaffProfile` model, linked 1:1 to Django's auth user |
-| `Dashboard` | KPIs (active items, low-stock count, out-of-stock count, recent transactions), reorder watchlist, status summary, category received/dispensed totals, recent dispensing feed | `/api/dashboard/` aggregation endpoint |
+| `Item Master` | `Item` | Master catalog definition, minimum thresholds, reorder quantities |
+| `Stock Receipts` | `StockReceipt` | Inbound stock transaction ledger with batch/lot and expiry tracking |
+| `Dispensing Log` | `DispenseLog` | Outbound stock transaction ledger with department & usage tracking |
+| `Current Stock` | `StockSnapshot` + `services.py` | Derived inventory position computed via ledger math and cached for UI speed |
+| `Settings` | `Category`, `Unit`, `Supplier` | Controlled drop-down vocabularies and validation parameters |
+| `Users` | `StaffProfile` | User roles (Manager, Technologist, Admin), signature initials, department tags |
+| `Dashboard` | `/api/dashboard/` | Real-time aggregate KPIs, reorder watchlists, and expiry watch feeds |
 
-The workbook's **"Future VBA Hook"** table on the Settings sheet maps almost 1:1 onto backend responsibilities:
+---
 
-| VBA Hook (spec) | Trigger | System equivalent |
+## 5. VBA Hook to Backend Equivalents
+
+| Excel VBA Hook | System Trigger | Backend Implementation |
 |---|---|---|
-| `ValidateReceiptEntry` | On receipt entry | `services.validate_receipt()` — item must exist & be active |
-| `ValidateDispenseEntry` | On dispense entry | `services.validate_dispense()` — qty ≤ available stock |
-| `RefreshDashboard` | On open / periodic | `/api/dashboard/` (on-demand) + `job_scheduler.py` cache refresh |
-| `ExportLowStockReport` | Button click | `/api/reports/low-stock/` (CSV/PDF export) |
-| `UserAuditStamp` | On change | `created_by` / `updated_at` auto-stamped in `models.py` via `services.py` |
-
-Stock status thresholds (from `Settings`):
-- **OK** — available quantity is above minimum stock level
-- **Low Stock** — available quantity is at or below minimum stock level
-- **Out of Stock** — available quantity is zero or below
+| `ValidateReceiptEntry` | POST `/api/stock-receipts/` | `services.validate_receipt()` ensures item is active and dates/quantities are valid |
+| `ValidateDispenseEntry` | POST `/api/dispensing-log/` | `services.validate_dispense()` prevents dispensing more than available inventory |
+| `RefreshDashboard` | Scheduled / On-Demand | `job_scheduler.py` runs periodic snapshot refreshes; endpoint serves cached state |
+| `ExportLowStockReport` | GET `/api/reports/low-stock/` | Service generates CSV/PDF export of items requiring reorder |
+| `UserAuditStamp` | Model save / update | `TimeStampedModel` + Django signals auto-write entries to `AuditLog` |
 
 ---
 
-## 2. Tech Stack
+## 6. Tech Stack
 
-**Backend:** Python, Django + Django REST Framework, single `inventory` app, JWT auth (SimpleJWT), APScheduler/Celery-beat for background jobs, PostgreSQL (SQLite for local dev).
-
-**Frontend:** React 18 + Vite, React Router, Context API for auth & flash notifications, plain CSS (no framework required), Axios for API calls.
+* **Backend:** Python 3.11+, Django 4.2+, Django REST Framework, SimpleJWT (Auth), APScheduler (Background jobs), PostgreSQL (SQLite for local dev).
+* **Frontend:** React 18, Vite, React Router v6, Context API (Auth & Notifications), Axios, CSS Modules / Custom CSS.
 
 ---
 
-## 3. Full Project Structure
+## 7. Full Project Structure
 
 ```
 lab-inventory-system/
@@ -53,37 +119,31 @@ lab-inventory-system/
 │   ├── requirements.txt
 │   ├── .env.example
 │   │
-│   ├── config/                      # Django project (main URLs + settings)
+│   ├── config/                      # Django core project configuration
 │   │   ├── __init__.py
-│   │   ├── settings.py              # DB, DRF, JWT, CORS, scheduler, apps config
-│   │   ├── urls.py                  # main urlconf -> includes inventory.urls
+│   │   ├── settings.py              # DB, DRF, JWT, CORS, scheduler settings
+│   │   ├── urls.py                  # Root route definitions
 │   │   ├── wsgi.py
 │   │   └── asgi.py
 │   │
-│   └── inventory/                   # single API application
+│   └── inventory/                   # LIMS core application
 │       ├── __init__.py
 │       ├── apps.py
-│       ├── admin.py
-│       ├── models.py                # Item, StockReceipt, DispenseLog, Category,
-│       │                            # Unit, Supplier, StaffProfile, Notification, AuditLog
-│       ├── serializers.py           # DRF serializers for every model + dashboard payloads
-│       ├── services.py              # business logic: stock calc, validation, dashboard
-│       │                            # aggregation, reorder logic, expiry watch
-│       ├── utils.py                 # code generators (LAB-###, REC-###, DIS-###),
-│       │                            # date helpers, status calculators, CSV export helpers
-│       ├── job_scheduler.py         # scheduled jobs: daily low-stock scan, expiry watch,
-│       │                            # dashboard cache refresh, notification dispatch
-│       ├── views.py                 # ViewSets/APIViews: Items, Receipts, Dispensing,
-│       │                            # CurrentStock (read-only), Dashboard, Users, Auth, Reports
-│       ├── urls.py                  # app-level urlconf, wired into DRF router
-│       ├── permissions.py           # role-based permissions (Manager vs Technologist)
-│       ├── validators.py            # field-level validators (expiry date, positive qty, etc.)
-│       ├── signals.py               # post_save hooks (audit stamps, stock recalculation)
+│       ├── admin.py                 # Django Admin portal registration
+│       ├── models.py                # Item, StockReceipt, DispenseLog, StockSnapshot,
+│       │                            # StaffProfile, Category, Unit, Supplier,
+│       │                            # Notification, AuditLog
+│       ├── serializers.py           # DRF serializers for API payloads
+│       ├── services.py              # Stock calculations, validation, dashboard logic
+│       ├── utils.py                 # ID generators (LAB-###, REC-###), status helpers
+│       ├── job_scheduler.py         # Scheduled tasks for snapshots and expiry checks
+│       ├── views.py                 # API ViewSets and Endpoints
+│       ├── urls.py                  # Application route registry
+│       ├── permissions.py           # Role-based access control (RBAC)
+│       ├── validators.py            # Custom validation logic
+│       ├── signals.py               # Post-save handlers for audit logs & caching
 │       ├── migrations/
 │       └── tests/
-│           ├── test_models.py
-│           ├── test_services.py
-│           └── test_views.py
 │
 └── frontend/
     ├── index.html
@@ -92,113 +152,70 @@ lab-inventory-system/
     ├── .env.example
     │
     └── src/
-        ├── main.jsx                        # ReactDOM root, wraps <App/> with providers
-        ├── App.jsx                         # routes, protected-route wrapper
-        │
+        ├── main.jsx                 # React DOM root entry
+        ├── App.jsx                  # Application routing & protection shells
         ├── services/
-        │   └── api.js                      # Axios instance, interceptors, endpoint calls
-        │
+        │   └── api.js               # Axios instance with auth interceptors
         ├── context/
-        │   ├── AuthContext.jsx             # login/logout, current user, token refresh
-        │   └── NotificationContext.jsx     # flash/toast notifications (success, error, warning)
-        │
+        │   ├── AuthContext.jsx      # JWT auth management
+        │   └── NotificationContext.jsx # Flash/toast notification context
         ├── components/
         │   ├── Navbar.jsx
         │   ├── Sidebar.jsx
-        │   ├── StatCard.jsx                # dashboard KPI card
-        │   ├── StockStatusBadge.jsx        # OK / Low Stock / Out of Stock pill
-        │   ├── DataTable.jsx               # reusable sortable/paginated table
+        │   ├── StatCard.jsx
+        │   ├── StockStatusBadge.jsx
+        │   ├── DataTable.jsx
         │   ├── Modal.jsx
-        │   ├── ConfirmDialog.jsx
-        │   └── FlashNotification.jsx       # renders toasts from NotificationContext
-        │
+        │   └── FlashNotification.jsx
         ├── layout/
-        │   └── DashboardLayout.jsx         # Navbar + Sidebar + <Outlet/> shell
-        │
+        │   └── DashboardLayout.jsx
         ├── pages/
         │   ├── Login.jsx
-        │   ├── Dashboard.jsx               # KPIs, reorder watchlist, status summary, recent txns
-        │   ├── ItemMaster.jsx              # list/create/edit/deactivate items
-        │   ├── StockReceipts.jsx           # log incoming stock
-        │   ├── DispensingLog.jsx           # log outgoing stock, blocks over-dispensing
-        │   ├── CurrentStock.jsx            # read-only computed stock position + filters
-        │   ├── ExpiryWatch.jsx             # batches expiring within 90 days
-        │   ├── Reports.jsx                 # low-stock / category summary export
-        │   ├── Users.jsx                   # staff directory, roles
-        │   ├── Settings.jsx                # categories, units, suppliers CRUD
-        │   └── NotFound.jsx
-        │
-        ├── hooks/
-        │   ├── useAuth.js                  # consumes AuthContext
-        │   ├── useNotification.js          # consumes NotificationContext
-        │   ├── useFetch.js                 # generic data-fetching hook
-        │   └── useDebounce.js              # for search inputs
-        │
-        └── style/
-            └── main.css
+        │   ├── Dashboard.jsx
+        │   ├── ItemMaster.jsx
+        │   ├── StockReceipts.jsx
+        │   ├── DispensingLog.jsx
+        │   ├── CurrentStock.jsx
+        │   ├── ExpiryWatch.jsx
+        │   ├── Reports.jsx
+        │   ├── Users.jsx
+        │   └── Settings.jsx
+        └── hooks/
+            ├── useAuth.js
+            ├── useNotification.js
+            ├── useFetch.js
+            └── useDebounce.js
 ```
 
 ---
 
-## 4. Backend data model (summary)
-
-```python
-# models.py (field summary, not full code)
-
-Category(name)
-Unit(name)
-Supplier(name, contact_info)
-
-StaffProfile(user -> auth.User, staff_id, role[Manager|Technologist|Admin],
-             department, phone, signature_initials, is_active)
-
-Item(item_code, item_name, category -> Category, unit -> Unit,
-     supplier -> Supplier, minimum_stock_level, reorder_quantity,
-     storage_location, is_active, remarks)
-
-StockReceipt(receipt_id, date, item -> Item, batch_lot, expiry_date,
-             supplier -> Supplier, quantity_received, unit_cost,
-             received_by -> StaffProfile, remarks, created_at)
-
-DispenseLog(dispense_id, date, item -> Item, batch_lot, quantity_dispensed,
-            dispensed_by -> StaffProfile, recipient_department, purpose,
-            remarks, created_at)
-
-Notification(recipient -> StaffProfile, message, level, is_read, created_at)
-
-AuditLog(user, action, target_model, target_id, timestamp)
-```
-
-`CurrentStock` is **not** a stored table — it is computed on demand in `services.py`
-(`available = sum(receipts.quantity_received) - sum(dispenses.quantity_dispensed)`) and
-cached/refreshed by `job_scheduler.py`, matching the workbook's "formula-driven" design.
-
----
-
-## 5. Key API endpoints (via `inventory/urls.py`)
+## 8. API Endpoints Overview
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/auth/login/` | Obtain JWT |
-| GET/POST | `/api/items/` | List / create items |
-| GET/PATCH | `/api/items/{item_code}/` | Retrieve / update / deactivate item |
-| GET/POST | `/api/stock-receipts/` | List / log a receipt |
-| GET/POST | `/api/dispensing-log/` | List / log a dispense (validated against available stock) |
-| GET | `/api/current-stock/` | Computed stock position, status, earliest expiry |
-| GET | `/api/dashboard/` | KPIs, reorder watchlist, status summary, category totals, recent txns |
-| GET | `/api/reports/low-stock/` | Exportable low-stock/reorder report |
-| GET | `/api/reports/expiry-watch/` | Batches expiring within 90 days |
-| GET/POST | `/api/users/` | Staff directory |
-| GET/POST | `/api/settings/categories/` `/units/` `/suppliers/` | Controlled lists |
+| POST | `/api/auth/login/` | Authenticate user and issue JWT access/refresh tokens |
+| GET / POST | `/api/items/` | List item master catalog or create new inventory item |
+| GET / PATCH | `/api/items/{item_code}/` | Retrieve details, update parameters, or deactivate an item |
+| GET / POST | `/api/stock-receipts/` | Retrieve inbound receipt log or register a new shipment |
+| GET / POST | `/api/dispensing-log/` | Retrieve outbound log or record stock usage (with validation) |
+| GET | `/api/current-stock/` | Read cached `StockSnapshot` data with search and category filters |
+| GET | `/api/dashboard/` | Aggregate KPIs, stock status distributions, and reorder alerts |
+| GET | `/api/reports/low-stock/` | Download CSV/PDF report of items requiring reorder |
+| GET | `/api/reports/expiry-watch/` | Fetch list of lot numbers expiring within the next 90 days |
+| GET / POST | `/api/users/` | Manage lab staff profiles and assign permissions |
+| GET / POST | `/api/settings/categories/` | CRUD endpoints for controlled categories |
+| GET / POST | `/api/settings/units/` | CRUD endpoints for controlled measurement units |
+| GET / POST | `/api/settings/suppliers/` | CRUD endpoints for supplier directory |
 
 ---
 
-## 6. Getting started
+## 9. Getting Started
 
-### Backend
+### Backend Setup
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 python manage.py migrate
@@ -206,19 +223,19 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Frontend
+### Frontend Setup
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # set VITE_API_BASE_URL=http://localhost:8000/api
+cp .env.example .env      # Ensure VITE_API_BASE_URL=http://localhost:8000/api
 npm run dev
 ```
 
 ---
 
-## 7. Notes / assumptions
+## 10. Implementation Assumptions & Rules
 
-- The workbook's `Users` sheet has no login credentials, so `StaffProfile` is modeled as a profile linked to Django's built-in auth `User`, not a replacement for it.
-- `Current Stock` and the `Dashboard` KPIs are derived, not duplicated tables, to avoid the double-bookkeeping risk that exists in the spreadsheet's manual formulas.
-- Role-based permissions (`permissions.py`) assume **Manager** can approve/edit item master & reports, **Technologist** can log receipts/dispenses only — inferred from the `Users` sheet roles; confirm before building auth rules further.
-- `job_scheduler.py` is where the workbook's `RefreshDashboard` "Workbook_Open" trigger and expiry-watch checks become real scheduled jobs (e.g., daily at 06:00).
+* **Auth & Profiles:** Django's built-in `User` handles authentication credentials, while `StaffProfile` holds domain-specific properties like staff IDs and roles (`Manager`, `Technologist`, `Admin`).
+* **Role Permissions:** Managers have permission to modify the `Item` catalog and generate administrative reports. Technologists are restricted to logging receipts and dispensing stock.
+* **Non-Destructive Deletions:** Items and user profiles are flagged as `is_active=False` rather than hard-deleted to preserve ledger integrity.
+* **Formula Integrity:** Stock availability is strictly derived from `StockReceipt` minus `DispenseLog` totals and updated via `StockSnapshot`. Direct modification of stock balances is forbidden.
